@@ -1,16 +1,15 @@
 import json
-import requests
+import os
 from concurrent.futures import ThreadPoolExecutor
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
-import os
 
 # Carregar os dados do arquivo JSON
 with open('Jogadores.json', 'r', encoding='utf-8') as f:
@@ -26,23 +25,13 @@ def iniciar_driver():
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
+    # Remover o argumento 'path' para compatibilidade
+    driver_path = ChromeDriverManager().install()
+    return webdriver.Chrome(service=Service(driver_path), options=options)
 
-# Função para salvar a foto do jogador
-# def salvar_foto(url, nome_jogador):
-#     try:
-#         response = requests.get(url, stream=True)
-#         if response.status_code == 200:
-#             filepath = f"fotos/{nome_jogador}.png"
-#             with open(filepath, 'wb') as f:
-#                 for chunk in response.iter_content(1024):
-#                     f.write(chunk)
-#             print(f"Foto salva: {filepath}")
-#         else:
-#             print(f"Erro ao baixar a foto de {nome_jogador}: {response.status_code}")
-#     except Exception as e:
-#         print(f"Erro ao salvar a foto de {nome_jogador}: {e}")
 
+# Função para processar um único jogador
 # Função para processar um único jogador
 def processar_jogador(jogador):
     driver = iniciar_driver()  # Inicia um novo driver para cada thread
@@ -72,12 +61,15 @@ def processar_jogador(jogador):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         table = soup.find('div', class_='MockStatsTable_statsTable__V_Skx')
         pontos, rebotes, assistencias, tres_pontos, roubos, bloqueios, turnovers = [], [], [], [], [], [], []
+        game_dates, matchups = [], []  # Novas listas para Game Date e Matchup
 
         if table:
             rows = table.find('table').find_all('tr')[1:6]  # Últimos 5 jogos
             for row in rows:
                 cols = row.find_all('td')
                 if len(cols) > 16:  # Garantir que há colunas suficientes
+                    game_dates.append(cols[0].text.strip())        # Game Date
+                    matchups.append(cols[1].text.strip())          # Matchup
                     pontos.append(int(cols[4].text.strip()))       # Pontos
                     rebotes.append(int(cols[16].text.strip()))     # Rebotes
                     assistencias.append(int(cols[17].text.strip())) # Assistências
@@ -86,16 +78,12 @@ def processar_jogador(jogador):
                     bloqueios.append(int(cols[19].text.strip()))    # Bloqueios
                     turnovers.append(int(cols[20].text.strip()))    # Turnovers
 
-        # # Salvar a foto do jogador
-        # image_element = soup.find('img', class_="PlayerImage_image__wH_YX")
-        # if image_element:
-        #     image_url = image_element['src']
-        #     salvar_foto(image_url, player_name)
-
         # Retornar os resultados processados
         return {
             'Nome Completo': jogador['PLAYER'],
             'Time': jogador['TEAM'],
+            'Game Dates': game_dates,          # Incluído Game Dates
+            'Matchups': matchups,              # Incluído Matchups
             'Últimos Pontos': pontos,
             'Últimos Rebotes': rebotes,
             'Últimas Assistências': assistencias,
@@ -112,6 +100,7 @@ def processar_jogador(jogador):
     finally:
         driver.quit()
     return None
+
 
 # Paralelismo para processar jogadores
 def processar_jogadores(jogadores_data):
