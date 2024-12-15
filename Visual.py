@@ -4,67 +4,99 @@ import pandas as pd
 import os
 
 # Configuração do Streamlit
-st.set_page_config(page_title="Estatísticas de Jogadores", layout="wide")
-st.title("Estatísticas de Jogadores da NBA")
+st.set_page_config(page_title="Estatísticas de Jogadores da NBA", layout="wide")
+st.title("🏀 Estatísticas de Jogadores da NBA")
 
-# Carregar o arquivo JSON diretamente do diretório
-caminho_json = os.path.join(os.path.dirname(__file__), "Jogadores_Resultado_Completo.json")
-try:
-    with open(caminho_json, 'r', encoding='utf-8') as f:
-        jogadores_data = json.load(f)
-except FileNotFoundError:
-    st.error("Arquivo JSON não encontrado. Certifique-se de que 'Jogadores_Resultado_Completo.json' está no mesmo diretório do script.")
-    st.stop()
+# Nome do arquivo JSON na pasta raiz
+arquivo_json = "Jogadores_Resultado_Completo.json"
 
-# Filtrar apenas jogadores com as chaves necessárias
-jogadores_com_dados = [jogador for jogador in jogadores_data if 'Time' in jogador and 'Nome Completo' in jogador]
+# Verificar se o arquivo existe
+if os.path.exists(arquivo_json):
+    try:
+        # Carregar dados do JSON
+        with open(arquivo_json, 'r', encoding='utf-8') as f:
+            jogadores_data = json.load(f)
 
-# Criar listas de times e status dinamicamente
-times_disponiveis = sorted(set(jogador['Time'] for jogador in jogadores_com_dados))
-# Identificar os campos de status dinamicamente, excluindo 'Nome Completo' e 'Time'
-status_disponiveis = [chave for chave in jogadores_com_dados[0].keys() if chave not in ['Nome Completo', 'Time']]
+        # Verificar se os campos necessários estão no JSON
+        if not all(key in jogadores_data[0] for key in ['Time', 'Nome Completo']):
+            st.error("O arquivo JSON não contém os campos necessários ('Time', 'Nome Completo').")
+            st.stop()
 
-# Seções da barra lateral para configuração do filtro
-st.sidebar.header("Configurações")
-time_selecionado = st.sidebar.selectbox("Escolha um time", times_disponiveis)
-status_selecionado = st.sidebar.selectbox("Escolha um status", status_disponiveis)
+        # Criar listas de times e status
+        times_disponiveis = sorted(set(jogador['Time'] for jogador in jogadores_data))
+        # Remover 'Game Dates' e 'Matchups' das estatísticas disponíveis
+        status_disponiveis = [key for key in jogadores_data[0].keys() if key not in ['Time', 'Nome Completo', 'Game Dates', 'Matchups']]
 
-# Filtrar jogadores do time selecionado
-jogadores_do_time = [jogador for jogador in jogadores_com_dados if jogador['Time'] == time_selecionado]
+        # Sidebar - Filtros
+        st.sidebar.header("Filtros")
+        time_selecionado = st.sidebar.selectbox("Escolha um time", times_disponiveis)
+        status_selecionado = st.sidebar.selectbox("Escolha uma estatística", status_disponiveis)
 
-# Dividir jogadores em pares
-jogadores_em_pares = [jogadores_do_time[i:i+2] for i in range(0, len(jogadores_do_time), 2)]
+        # Determinar o valor máximo para o filtro baseado nos dados
+        max_valor = max(
+            max((valor for valor in jogador.get(status_selecionado, []) if isinstance(valor, (int, float))), default=0)
+            for jogador in jogadores_data
+        )
+        valor_referencia = st.sidebar.number_input("Escolha um valor de referência", min_value=1, max_value=max_valor, value=5)
 
-# Exibir informações dos jogadores em pares
-for par in jogadores_em_pares:
-    cols = st.columns(2)  # Criar duas colunas para os pares
-    for idx, jogador in enumerate(par):
-        # Dados do jogador
-        nome_jogador = jogador.get('Nome Completo', 'Jogador Desconhecido')
-        time_jogador = jogador.get('Time', 'Desconhecido')
-        caminho_imagem = f"fotos/{nome_jogador.lower().replace(' ', '-')}.png"
-        if not os.path.exists(caminho_imagem):
-            caminho_imagem = "https://via.placeholder.com/150"  # Imagem padrão se não for encontrada
+        # Filtrar jogadores do time selecionado
+        jogadores_do_time = [jogador for jogador in jogadores_data if jogador['Time'] == time_selecionado]
 
-        # Dados do status selecionado
-        dados_status = jogador.get(status_selecionado, [])
+        st.subheader(f"📊 Estatística Selecionada: {status_selecionado}")
+        resultados = []
 
-        # Exibir informações do jogador na coluna correspondente
-        with cols[idx]:
-            st.image(caminho_imagem, width=150)
-            st.subheader(nome_jogador)
-            if isinstance(dados_status, list) and dados_status:
-                st.metric(label="Média nos Últimos Jogos", value=round(pd.Series(dados_status).mean(), 2))
-                st.metric(label="Máximo nos Últimos Jogos", value=max(dados_status))
-                st.subheader(f"Resumo dos Últimos Jogos - {status_selecionado}")
-                st.write(
-                    pd.DataFrame(
-                        {
-                            "Jogo": range(1, len(dados_status) + 1),
-                            status_selecionado: dados_status,
-                        }
-                    )
-                )
-            else:
-                st.warning("Dados insuficientes para mostrar estatísticas.")
-    st.markdown("---")  # Linha separadora entre pares
+        # Exibir informações do jogador
+        for jogador in jogadores_do_time:
+            nome_jogador = jogador['Nome Completo']
+            valores_status = jogador.get(status_selecionado, [])
+            game_dates = jogador.get("Game Dates", [])
+            matchups = jogador.get("Matchups", [])
+
+            # Verificar se há dados suficientes
+            if not valores_status or not all(isinstance(val, (int, float)) for val in valores_status):
+                st.write(f"**{nome_jogador}** não possui dados suficientes para {status_selecionado}.")
+                continue
+
+            # Calcular média e contagem de partidas que bateram o valor de referência
+            media_status = round(pd.Series(valores_status).mean(), 2)
+            qtd_batidas = sum(1 for valor in valores_status if valor >= valor_referencia)
+
+            # Caminho da foto do jogador
+            caminho_imagem = f"fotos/{nome_jogador.lower().replace(' ', '-')}.png"
+            if not os.path.exists(caminho_imagem):
+                caminho_imagem = "https://via.placeholder.com/150"  # Imagem padrão
+
+            # Exibir informações no Streamlit
+            st.markdown("----")
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                st.image(caminho_imagem, width=150)
+            with col2:
+                st.subheader(nome_jogador)
+                st.write(f"**Time:** {jogador['Time']}")
+                st.write(f"**Média nos Últimos Jogos ({status_selecionado}):** {media_status}")
+                st.write(f"**Partidas que Bateram o Valor {valor_referencia}:** {qtd_batidas}")
+
+            # Exibir tabela com os valores dos últimos jogos
+            st.write(f"**Últimos Jogos ({status_selecionado}):**")
+            df_jogos = pd.DataFrame({
+                "Game Date": game_dates,
+                "Matchup": matchups,
+                status_selecionado: valores_status
+            })
+            st.dataframe(df_jogos, use_container_width=True)
+
+            # Salvar resultado na lista para referência
+            resultados.append({
+                "Jogador": nome_jogador,
+                "Média": media_status,
+                "Partidas que Bateram o Valor": qtd_batidas
+            })
+
+       
+    except KeyError as e:
+        st.error(f"Erro ao acessar campo no JSON: {e}")
+    except Exception as e:
+        st.error(f"Ocorreu um erro inesperado: {e}")
+else:
+    st.error(f"O arquivo '{arquivo_json}' não foi encontrado na pasta raiz. Certifique-se de que o arquivo está no local correto.")
