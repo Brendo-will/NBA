@@ -10,6 +10,41 @@ st.title("🏀 Estatísticas de Jogadores da NBA")
 # Nome do arquivo JSON na pasta raiz
 arquivo_json = "Jogadores_Resultado_Completo.json"
 
+# Mapeamento de siglas para nomes completos dos times
+nomes_times = {
+    "MIL": "Milwaukee Bucks",
+    "DEN": "Denver Nuggets",
+    "CHA": "Charlotte Hornets",
+    "OKC": "Oklahoma City Thunder",
+    "BOS": "Boston Celtics",
+    "DAL": "Dallas Mavericks",
+    "LAL": "Los Angeles Lakers",
+    "MIN": "Minnesota Timberwolves",
+    "SAC": "Sacramento Kings",
+    "PHX": "Phoenix Suns",
+    "NYK": "New York Knicks",
+    "BKN": "Brooklyn Nets",
+    "PHI": "Philadelphia 76ers",
+    "MIA": "Miami Heat",
+    "CLE": "Cleveland Cavaliers",
+    "GSW": "Golden State Warriors",
+    "CHI": "Chicago Bulls",
+    "SAS": "San Antonio Spurs",
+    "TOR": "Toronto Raptors",
+    "WAS": "Washington Wizards",
+    "ATL": "Atlanta Hawks",
+    "NOP": "New Orleans Pelicans",
+    "UTA": "Utah Jazz",
+    "HOU": "Houston Rockets",
+    "MEM": "Memphis Grizzlies",
+    "POR": "Portland Trail Blazers",
+    "LAC": "Los Angeles Clippers",
+    "IND": "Indiana Pacers",
+    "DET": "Detroit Pistons",
+    "ORL": "Orlando Magic"
+}
+
+
 # Verificar se o arquivo existe
 if os.path.exists(arquivo_json):
     try:
@@ -29,7 +64,7 @@ if os.path.exists(arquivo_json):
 
         # Sidebar - Filtros
         st.sidebar.header("Filtros")
-        time_selecionado = st.sidebar.selectbox("Escolha um time", times_disponiveis)
+        time_selecionado = st.sidebar.selectbox("Escolha um time", nomes_times.keys(), format_func=lambda x: nomes_times[x])
         status_selecionado = st.sidebar.selectbox("Escolha uma estatística", status_disponiveis)
 
         # Determinar o valor máximo para o filtro baseado nos dados
@@ -73,7 +108,8 @@ if os.path.exists(arquivo_json):
                 st.image(caminho_imagem, width=150)
             with col2:
                 st.subheader(nome_jogador)
-                st.write(f"**Time:** {jogador['Time']}")
+                nome_time_completo = nomes_times.get(jogador['Time'], jogador['Time'])
+                st.write(f"**Time:** {nome_time_completo}")
                 st.write(f"**Média nos Últimos Jogos ({status_selecionado}):** {media_status}")
                 st.write(f"**Partidas que Bateram o Valor {valor_referencia}:** {qtd_batidas}")
 
