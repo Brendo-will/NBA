@@ -62,6 +62,7 @@ def carregar_logo_time(nome_time):
         return DEFAULT_LOGO
 
 
+
 # Função para carregar a foto do jogador
 def carregar_foto_jogador(nome_completo):
     nome_formatado = nome_completo.lower().replace(" ", "-") + ".png"
