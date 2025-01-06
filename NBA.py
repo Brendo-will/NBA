@@ -53,13 +53,11 @@ def obter_jogos_time(team_id):
 
 # Função para carregar o logo do time
 def carregar_logo_time(nome_time):
-    nome_formatado = nome_time.lower().replace(" ", "_").replace("-", "_")
-    caminho_logo = os.path.join(LOGOS_DIR, f"{nome_formatado}.png")
-    st.write(f"Buscando logo em: {caminho_logo}")  # Linha de depuração
-    if os.path.isfile(caminho_logo):
-        return caminho_logo
-    else:
-        return DEFAULT_LOGO
+    nome_formatado = nome_time.lower().replace(" ", "_").replace("-", "_") + ".png"
+    for arquivo in os.listdir(LOGOS_DIR):
+        if arquivo.lower() == nome_formatado:
+            return os.path.join(LOGOS_DIR, arquivo)
+    return DEFAULT_LOGO
 
 
 
