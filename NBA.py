@@ -9,7 +9,8 @@ import plotly.graph_objects as go
 DEFAULT_IMAGE = "https://via.placeholder.com/150"
 IMAGES_DIR = "fotos"
 DEFAULT_LOGO = "https://via.placeholder.com/150"
-LOGOS_DIR = "Logos"
+LOGOS_DIR = os.path.join(BASE_DIR, "Logos")
+
 
 # Função para obter dados dos times via API
 @st.cache_data
