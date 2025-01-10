@@ -6,6 +6,7 @@ from PIL import Image
 import os
 import plotly.graph_objects as go
 
+os.path.dirname(os.path.abspath(__file__))
 DEFAULT_IMAGE = "https://via.placeholder.com/150"
 IMAGES_DIR = "fotos"
 DEFAULT_LOGO = "https://via.placeholder.com/150"
