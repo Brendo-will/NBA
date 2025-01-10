@@ -55,13 +55,21 @@ def obter_jogos_time(team_id):
 
 # Função para carregar o logo do time
 def carregar_logo_time(nome_time):
-    nome_formatado = nome_time.upper().replace(" ", "_").replace("-", "_")  # Converter para maiúsculas
-    caminho_logo = os.path.join(LOGOS_DIR, f"{nome_formatado}.png")
-    if os.path.exists(caminho_logo):
-        return caminho_logo
-    else:
-        st.write(f"Logo NÃO encontrado: {caminho_logo}")
-        return DEFAULT_LOGO
+    nome_formatado = nome_time.strip().upper().replace(" ", "_").replace("-", "_")
+    png_path = os.path.join(LOGOS_DIR, f"{nome_formatado}.png")
+    jpg_path = os.path.join(LOGOS_DIR, f"{nome_formatado}.jpg")
+    
+    st.write(f"Tentando PNG: {png_path}")
+    if os.path.exists(png_path):
+        return png_path
+    
+    st.write(f"Tentando JPG: {jpg_path}")
+    if os.path.exists(jpg_path):
+        return jpg_path
+    
+    st.write(f"Não encontrou nem .png nem .jpg para: {nome_formatado}")
+    return DEFAULT_LOGO
+
         
 
 # Função para carregar a foto do jogador
