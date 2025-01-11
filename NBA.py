@@ -6,11 +6,14 @@ from PIL import Image
 import os
 import plotly.graph_objects as go
 
-os.path.dirname(os.path.abspath(__file__))
-DEFAULT_IMAGE = "https://via.placeholder.com/150"
-IMAGES_DIR = "fotos"
-DEFAULT_LOGO = "https://via.placeholder.com/150"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGOS_DIR = os.path.join(BASE_DIR, "Logos")
+IMAGES_DIR = os.path.join(BASE_DIR, "fotos")
+
+DEFAULT_IMAGE = "https://via.placeholder.com/150"
+DEFAULT_LOGO = "https://via.placeholder.com/150"
+
+
 
 
 # Função para obter dados dos times via API
