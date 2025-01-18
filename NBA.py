@@ -62,11 +62,11 @@ def carregar_logo_time(nome_time):
     png_path = os.path.join(LOGOS_DIR, f"{nome_formatado}.png")
     jpg_path = os.path.join(LOGOS_DIR, f"{nome_formatado}.jpg")
     
-    st.write(f"Tentando PNG: {png_path}")
+    
     if os.path.exists(png_path):
         return png_path
     
-    st.write(f"Tentando JPG: {jpg_path}")
+    
     if os.path.exists(jpg_path):
         return jpg_path
     
