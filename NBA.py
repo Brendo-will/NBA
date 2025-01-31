@@ -1,10 +1,11 @@
- import streamlit as st
+import streamlit as st
 import pandas as pd
 from nba_api.stats.static import teams, players
-from nba_api.stats.endpoints import commonteamroster, playergamelog, teamgamelog
+from nba_api.stats.endpoints import commonteamroster, playergamelog, teamgamelog, leaguegamefinder
 from PIL import Image
 import os
 import plotly.graph_objects as go
+from datetime import datetime, timedelta
 
 # Configurações de diretório
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -153,6 +154,43 @@ def calcular_porcentagem_pontos_adversario(team_id, season):
     perc_conceded_3p = (pts_conceded_3p / total_points_conceded) * 100 if total_points_conceded > 0 else 0
     
     return perc_conceded_2p, perc_conceded_3p
+
+# Função para obter os jogos dos próximos 7 dias
+def obter_proximos_jogos():
+    try:
+        # Obter todos os jogos da temporada atual
+        gamefinder = leaguegamefinder.LeagueGameFinder(season_nullable='2023-24')
+        games = gamefinder.get_data_frames()[0]
+
+        # Filtrar jogos futuros (próximos 7 dias)
+        hoje = datetime.today()
+        sete_dias_depois = hoje + timedelta(days=7)
+        games['GAME_DATE'] = pd.to_datetime(games['GAME_DATE'])
+        proximos_jogos = games[(games['GAME_DATE'] >= hoje) & (games['GAME_DATE'] <= sete_dias_depois)]
+
+        return proximos_jogos
+    except Exception as e:
+        st.error(f"Erro ao obter os próximos jogos: {e}")
+        return pd.DataFrame()
+
+# Página 4: Próximos Jogos
+def pagina_proximos_jogos():
+    st.header("📅 Próximos Jogos (7 Dias)")
+    with st.spinner("Carregando os próximos jogos..."):
+        proximos_jogos = obter_proximos_jogos()
+
+    if not proximos_jogos.empty:
+        st.subheader("Jogos dos Próximos 7 Dias")
+        st.dataframe(proximos_jogos[["GAME_DATE", "MATCHUP", "HOME_TEAM", "VISITOR_TEAM"]].rename(
+            columns={
+                "GAME_DATE": "Data",
+                "MATCHUP": "Confronto",
+                "HOME_TEAM": "Time da Casa",
+                "VISITOR_TEAM": "Time Visitante"
+            }
+        ))
+    else:
+        st.write("Nenhum jogo encontrado para os próximos 7 dias.")
 
 # Página 1: Estatísticas de Times
 def pagina_times():
@@ -405,7 +443,7 @@ def pagina_analise_contra_adversario():
 
 # Navegação entre páginas
 st.sidebar.title("Navegação")
-pagina = st.sidebar.radio("Escolha uma página", ["Times", "Jogadores", "Análise Contra Adversário"])
+pagina = st.sidebar.radio("Escolha uma página", ["Times", "Jogadores", "Análise Contra Adversário", "Próximos Jogos"])
 
 if pagina == "Times":
     pagina_times()
@@ -413,3 +451,5 @@ elif pagina == "Jogadores":
     pagina_jogadores()
 elif pagina == "Análise Contra Adversário":
     pagina_analise_contra_adversario()
+elif pagina == "Próximos Jogos":
+    pagina_proximos_jogos()
