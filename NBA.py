@@ -6,6 +6,10 @@ from PIL import Image
 import os
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import requests
+import pandas as pd
+import streamlit as st
+from datetime import datetime
 
 # Configurações de diretório
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -156,41 +160,52 @@ def calcular_porcentagem_pontos_adversario(team_id, season):
     return perc_conceded_2p, perc_conceded_3p
 
 # Função para obter os jogos dos próximos 7 dias
+@st.cache_data
+@st.cache_data
 def obter_proximos_jogos():
     try:
-        # Obter todos os jogos da temporada atual
-        gamefinder = leaguegamefinder.LeagueGameFinder(season_nullable='2023-24')
-        games = gamefinder.get_data_frames()[0]
+        # URL da API da NBA que retorna o calendário da temporada 2024-25
+        url = 'https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/2024/league/00_full_schedule.json'
+        response = requests.get(url)
+        data = response.json()
 
-        # Filtrar jogos futuros (próximos 7 dias)
-        hoje = datetime.today()
-        sete_dias_depois = hoje + timedelta(days=7)
-        games['GAME_DATE'] = pd.to_datetime(games['GAME_DATE'])
-        proximos_jogos = games[(games['GAME_DATE'] >= hoje) & (games['GAME_DATE'] <= sete_dias_depois)]
+        jogos_futuros = []
+        hoje = datetime.now()
 
-        return proximos_jogos
+        # Percorre os dados da API e filtra os jogos futuros
+        for mes in data['lscd']:  # Lista de meses
+            for jogo in mes['mscd']['g']:  # Lista de jogos no mês
+                data_jogo = datetime.strptime(jogo['gdte'], '%Y-%m-%d')
+                if data_jogo >= hoje:  # Pegamos apenas os jogos que ainda não aconteceram
+                    jogos_futuros.append({
+                        'Data': data_jogo.strftime('%d/%m/%Y'),  # Formato de data ajustado
+                        'Confronto': f"{jogo['v']['tn']} @ {jogo['h']['tn']}",
+                        'Time Visitante': jogo['v']['tn'],
+                        'Time da Casa': jogo['h']['tn']
+                    })
+
+        # Converte a lista para DataFrame
+        proximos_jogos_df = pd.DataFrame(jogos_futuros)
+
+        return proximos_jogos_df
+
     except Exception as e:
         st.error(f"Erro ao obter os próximos jogos: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=["Data", "Confronto", "Time Visitante", "Time da Casa"])
 
 # Página 4: Próximos Jogos
 def pagina_proximos_jogos():
-    st.header("📅 Próximos Jogos (7 Dias)")
+    st.header("📅 Próximos Jogos da NBA")
     with st.spinner("Carregando os próximos jogos..."):
         proximos_jogos = obter_proximos_jogos()
 
     if not proximos_jogos.empty:
-        st.subheader("Jogos dos Próximos 7 Dias")
-        st.dataframe(proximos_jogos[["GAME_DATE", "MATCHUP", "HOME_TEAM", "VISITOR_TEAM"]].rename(
-            columns={
-                "GAME_DATE": "Data",
-                "MATCHUP": "Confronto",
-                "HOME_TEAM": "Time da Casa",
-                "VISITOR_TEAM": "Time Visitante"
-            }
-        ))
+        st.subheader("Jogos dos Próximos Dias")
+        st.dataframe(proximos_jogos)
     else:
-        st.write("Nenhum jogo encontrado para os próximos 7 dias.")
+        st.write("Nenhum jogo encontrado para os próximos dias.")
+
+
 
 # Página 1: Estatísticas de Times
 def pagina_times():
@@ -416,6 +431,30 @@ def pagina_analise_contra_adversario():
 
                 # Nova Seção: Análise de Porcentagem de Pontos
                 st.subheader("📊 Análise de Porcentagem de Pontos")
+                
+                @st.cache_data
+                def calcular_porcentagem_pontos_adversario(team_id, season):
+                    try:
+                        team_log = teamgamelog.TeamGameLog(team_id=team_id, season=season).get_data_frames()[0]
+
+                        # Calculando pontos concedidos no garrafão e de 3 pontos
+                        team_log['PTS_3P_CONCEDIDOS'] = team_log['FG3M'] * 3  # Total de pontos do adversário vindo de 3 pontos
+                        team_log['PTS_2P_CONCEDIDOS'] = (team_log['FGM'] - team_log['FG3M']) * 2  # Total de pontos de 2 pontos
+
+                        # Calculando a porcentagem
+                        total_points_conceded = team_log['PTS'].sum()
+                        if total_points_conceded > 0:
+                            perc_conceded_2p = (team_log['PTS_2P_CONCEDIDOS'].sum() / total_points_conceded) * 100
+                            perc_conceded_3p = (team_log['PTS_3P_CONCEDIDOS'].sum() / total_points_conceded) * 100
+                        else:
+                            perc_conceded_2p, perc_conceded_3p = 0, 0
+
+                        return perc_conceded_2p, perc_conceded_3p
+
+                    except Exception as e:
+                        st.error(f"Erro ao calcular estatísticas do adversário: {e}")
+                        return 0, 0
+
 
                 # Calcular porcentagens do jogador
                 perc_2p_jogador, perc_3p_jogador = calcular_porcentagem_pontos_jogador(player_id, temporadas_selecionadas[0])
