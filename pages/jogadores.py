@@ -4,6 +4,22 @@ from utils.image_utils import carregar_foto_jogador
 from nba_api.stats.endpoints import playergamelog
 import plotly.graph_objects as go
 from utils.api_utils import obter_dados_jogadores, obter_dados_times, obter_historico_por_temporadas
+import base64
+import os
+
+FOTOS_DIR = "fotos"
+
+def carregar_foto_jogador(nome_jogador):
+    nome_formatado = nome_jogador.lower().replace(" ", "-") + ".png"
+    caminho_foto = os.path.join(FOTOS_DIR, nome_formatado)
+
+    if os.path.exists(caminho_foto):  # Confirma se o arquivo existe
+        with open(caminho_foto, "rb") as img_file:
+            base64_str = base64.b64encode(img_file.read()).decode()
+            return f"data:image/png;base64,{base64_str}"
+    
+    # Se a imagem não for encontrada, use um placeholder online
+    return "https://via.placeholder.com/150"
 
 def calcular_porcentagem_pontos_jogador(player_id, season):
     """
@@ -66,7 +82,8 @@ def pagina_jogadores():
             col1, col2 = st.columns([1, 3])
             with col1:
                 foto = carregar_foto_jogador(jogador_selecionado)
-                st.image(foto, width=150)
+                st.markdown(f'<img src="{foto}" width="150">', unsafe_allow_html=True)
+
             with col2:
                 st.write(f"**Time:** {time_nome}")
 
