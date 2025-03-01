@@ -1,136 +1,164 @@
 import streamlit as st
 import pandas as pd
-import os
-import base64
 import time
-from nba_api.stats.endpoints import leaguedashteamstats
+from datetime import datetime
+import pytz
+from nba_api.stats.static import teams
+from nba_api.stats.endpoints import ScoreboardV2
 from requests.exceptions import ReadTimeout, ConnectionError
-
+from nba_api.stats.endpoints import (
+    leaguedashteamstats,
+    LeagueStandingsV3,
+    WinProbabilityPBP,
+    PlayoffPicture,
+    VideoDetails,
+    VideoEvents
+)
 # Configuração da página
 st.set_page_config(page_title="NBA Dashboard", layout="wide")
 
 # Diretório de logos
 LOGOS_DIR = "Logos"
 
-# Função para carregar logos em Base64
-def carregar_logo_base64(nome_time):
-    nome_formatado = nome_time.lower().replace(" ", "_") + ".png"
-    caminho_logo = os.path.join(LOGOS_DIR, nome_formatado)
-
-    if os.path.exists(caminho_logo):
-        with open(caminho_logo, "rb") as img_file:
-            base64_str = base64.b64encode(img_file.read()).decode()
-            return f"data:image/png;base64,{base64_str}"
-    return None
-
-# Função para obter os dados médios por jogo com tratamento de erro
+# Função para obter estatísticas por jogo
 def obter_dados_por_jogo(retries=3, timeout=45):
     for tentativa in range(retries):
         try:
-            ranking = leaguedashteamstats.LeagueDashTeamStats(
-                season="2024-25",
-                season_type_all_star="Regular Season",
-                per_mode_detailed="PerGame"
-            ).get_data_frames()[0]
+            with st.spinner("📊 Buscando estatísticas de times..."):
+                ranking = leaguedashteamstats.LeagueDashTeamStats(
+                    season="2024-25",
+                    season_type_all_star="Regular Season",
+                    per_mode_detailed="PerGame"
+                ).get_data_frames()[0]
 
-            # Selecionar colunas relevantes
             colunas_desejadas = [
-                "TEAM_NAME", "GP", "W", "L", "MIN", "PTS", 
-                "FGM", "FGA", "FG_PCT", "FG3M", "FG3A", "FG3_PCT", "FTM", "FTA", 
-                "FT_PCT", "OREB", "DREB", "REB", "AST", "TOV", "STL", 
-                "BLK", "BLKA", "PF", "PFD", "PLUS_MINUS"
+                "TEAM_NAME", "GP", "W", "L", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG_PCT", "FG3_PCT", "FT_PCT", "PLUS_MINUS"
             ]
-            colunas_disponiveis = [col for col in colunas_desejadas if col in ranking.columns]
-            df = ranking[colunas_disponiveis].reset_index(drop=True)
-
-            # Ordenar pelo número de vitórias
-            df = df.sort_values(by="W", ascending=False)
+            df = ranking[colunas_desejadas].reset_index(drop=True)
 
             return df
 
         except ReadTimeout:
-            st.warning(f"Tentativa {tentativa + 1}/{retries}: A API da NBA está demorando para responder. Tentando novamente...")
-            time.sleep(5)  # Aguarda 5 segundos antes de tentar novamente
+            st.warning(f"Tentativa {tentativa + 1}/{retries}: Tempo limite excedido. Tentando novamente...")
+            time.sleep(5)
 
         except ConnectionError:
             st.error("Erro de conexão. Verifique sua internet e tente novamente.")
             return None
 
-    st.error("Falha ao obter dados após várias tentativas. A API pode estar fora do ar.")
+    st.error("❌ Falha ao obter dados após várias tentativas.")
     return None
 
-# Barra lateral
-st.sidebar.title("📌 Navegação")
-st.sidebar.info("Escolha uma página no menu lateral")
-
-# Título principal
+# 🔹 Obtendo dados da NBA
 st.title("🏀 NBA Dashboard - Estatísticas da Temporada 2024-25")
-st.write("Bem-vindo ao dashboard interativo da NBA. Escolha uma página no menu lateral para visualizar estatísticas de times, jogadores e análises contra adversários.")
+st.write("Selecione abaixo a métrica para ordenar os times e veja os melhores desempenhos da temporada.")
 
-# Obtendo os dados médios por jogo
 ranking_geral = obter_dados_por_jogo()
 
 if ranking_geral is not None:
-    # Adicionando logos em Base64
-    ranking_geral["Logo_Base64"] = ranking_geral["TEAM_NAME"].apply(carregar_logo_base64)
+    # 🔹 Adicionar um seletor para escolher a métrica de ordenação
+    metrica_opcoes = {
+        "Vitórias": "W",
+        "Pontos por Jogo": "PTS",
+        "Rebotes por Jogo": "REB",
+        "Assistências por Jogo": "AST",
+        "Roubos de Bola por Jogo": "STL",
+        "Bloqueios por Jogo": "BLK",
+        "Turnovers por Jogo": "TOV",
+        "Aproveitamento de Arremessos": "FG_PCT",
+        "Aproveitamento de 3 Pontos": "FG3_PCT",
+        "Aproveitamento de Lance Livre": "FT_PCT",
+        "Saldo de Pontos": "PLUS_MINUS"
+    }
 
-    # Estilos CSS para a tabela
-    st.markdown("""
-    <style>
-        .fixed-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .fixed-table thead {
-            position: sticky;
-            top: 0;
-            background-color: white;
-            z-index: 1;
-        }
-        .fixed-table th {
-            background-color: #f4f4f4;
-            text-align: center;
-            padding: 8px;
-        }
-        .fixed-table td {
-            text-align: center;
-            padding: 8px;
-        }
-        .team-name {
-            text-align: left;
-        }
-        img {
-            vertical-align: middle;
-            margin-right: 10px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    metrica_escolhida = st.selectbox(
+        "📊 Escolha uma estatística para ordenar:",
+        list(metrica_opcoes.keys()),
+        index=0
+    )
 
-    # Criando a tabela HTML
-    tabela_html = "<table class='fixed-table'><thead><tr>"
-    tabela_html += "<th>#</th><th>TEAM</th><th>GP</th><th>W</th><th>L</th><th>MIN</th><th>PTS</th>"
-    tabela_html += "<th>FGM</th><th>FGA</th><th>FG%</th><th>3PM</th><th>3PA</th><th>3P%</th><th>FTM</th><th>FTA</th>"
-    tabela_html += "<th>FT%</th><th>OREB</th><th>DREB</th><th>REB</th><th>AST</th><th>TOV</th><th>STL</th>"
-    tabela_html += "<th>BLK</th><th>BLKA</th><th>PF</th><th>PFD</th><th>+/-</th></tr></thead><tbody>"
+    # 🔹 Adicionar um slider para limitar o número de times exibidos
+    num_times = st.slider("📌 Quantidade de times a exibir:", 5, len(ranking_geral), 10)
 
-    # Populando a tabela com os dados
-    for i, row in ranking_geral.iterrows():
-        # Criando links para o logo e o nome do time
-        team_link = f"/times?team={row['TEAM_NAME']}"
-        logo_html = f'<a href="{team_link}" target="_blank"><img src="{row["Logo_Base64"]}" width="25"></a>' if row["Logo_Base64"] else ""
-        name_html = f'<a href="{team_link}" target="_blank">{row["TEAM_NAME"]}</a>'
+    # 🔹 Ordenar os times pela métrica selecionada
+    ranking_ordenado = ranking_geral.sort_values(by=metrica_opcoes[metrica_escolhida], ascending=False).head(num_times)
 
-        tabela_html += "<tr>"
-        tabela_html += f"<td>{i+1}</td>"
-        tabela_html += f'<td class="team-name">{logo_html} {name_html}</td>'
-        tabela_html += "".join([f"<td>{row[col] if col in ranking_geral.columns else '-'}</td>" for col in [
-            "GP", "W", "L", "MIN", "PTS", "FGM", "FGA", "FG_PCT",
-            "FG3M", "FG3A", "FG3_PCT", "FTM", "FTA", "FT_PCT", "OREB", "DREB", "REB",
-            "AST", "TOV", "STL", "BLK", "BLKA", "PF", "PFD", "PLUS_MINUS"
-        ]])
-        tabela_html += "</tr>"
+    # 🔹 Exibir a tabela filtrada
+    st.subheader(f"🏆 Top {num_times} Times - {metrica_escolhida}")
+    st.dataframe(ranking_ordenado)
 
-    tabela_html += "</tbody></table>"
+# 🔹 Criar um dicionário com os nomes dos times baseados no ID
+def carregar_nomes_times():
+    lista_times = teams.get_teams()
+    return {team["id"]: team["full_name"] for team in lista_times}
 
-    # Exibir a tabela
-    st.markdown(tabela_html, unsafe_allow_html=True)
+# Dicionário global dos times
+NOMES_TIMES = carregar_nomes_times()
+
+# 🔹 Função para converter o horário da NBA (ET) para o horário de Brasília (BRT)
+def converter_horario_nba_para_brasil(horario_et):
+    try:
+        # Converter string "6:00 pm ET" para datetime
+        hora_et = datetime.strptime(horario_et.replace(" ET", ""), "%I:%M %p")
+
+        # Ajustar fuso horário (ET + 2 horas para BRT)
+        hora_brasil = hora_et + pd.Timedelta(hours=2)
+
+        return hora_brasil.strftime("%H:%M %p")  # Retorna formato legível (ex: 20:00 PM)
+    
+    except Exception:
+        return "Horário inválido"  # Em caso de erro
+
+# 🔹 Função para obter os jogos e depurar a resposta da API
+def obter_jogos_do_dia():
+    try:
+        # Ajustar para o fuso horário da NBA (Eastern Time)
+        est = pytz.timezone("US/Eastern")
+        data_atual_est = datetime.now(est).strftime("%Y-%m-%d")
+
+        with st.spinner(f"⏳ Buscando jogos para {data_atual_est}..."):
+            scoreboard = ScoreboardV2(game_date=data_atual_est)
+            df_lista = scoreboard.get_data_frames()
+
+            # Verificar se alguma resposta foi retornada
+            if not df_lista:
+                st.error("⚠️ Nenhum dado retornado pela API!")
+                return None
+            
+            df = df_lista[0]  # Pegar o primeiro DataFrame retornado
+
+           
+
+            # 🔹 Verificar os status dos jogos
+            if "GAME_STATUS_TEXT" in df.columns:
+                df["Casa"] = df["HOME_TEAM_ID"].map(NOMES_TIMES)
+                df["Visitante"] = df["VISITOR_TEAM_ID"].map(NOMES_TIMES)
+
+                # Aplicar conversão do horário ET para BRT
+                df["HORÁRIO_BRASIL"] = df["GAME_STATUS_TEXT"].apply(converter_horario_nba_para_brasil)
+
+                # st.write("📌 Status dos Jogos Retornados:")
+                # st.dataframe(df[["Casa", "Visitante", "HORÁRIO_BRASIL", "GAME_STATUS_TEXT"]])
+
+                # Filtrar jogos agendados ou em andamento
+                jogos_agendados = df[df["GAME_STATUS_TEXT"].str.contains("Scheduled|Pre|pm ET|am ET", na=False)]
+                return jogos_agendados
+
+            else:
+                st.error("❌ `GAME_STATUS_TEXT` não encontrado na resposta da API.")
+                return None
+
+    except Exception as e:
+        st.error(f"Erro ao obter jogos do dia: {e}")
+        return None
+
+
+# 🔹 Obter os dados
+jogos_agendados = obter_jogos_do_dia()
+
+# 🔹 Exibir Jogos Agendados
+st.subheader("📅 Jogos do dia")
+if jogos_agendados is not None and not jogos_agendados.empty:
+    st.dataframe(jogos_agendados[["Casa", "Visitante", "HORÁRIO_BRASIL"]])
+else:
+    st.write("📌 Nenhum jogo agendado encontrado na API.")
