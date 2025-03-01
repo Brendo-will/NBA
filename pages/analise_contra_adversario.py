@@ -21,9 +21,5 @@ if st.button("Analisar"):
     jogos = historico[historico["MATCHUP"].str.contains(adversario_abbr)]
     
     if not jogos.empty:
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=jogos["GAME_DATE"], y=jogos["PTS"], text=jogos["PTS"], textposition="outside"
-        ))
-        st.plotly_chart(fig)
-        st.dataframe(jogos[["GAME_DATE", "MATCHUP", "PTS", "REB", "AST"]])
+       
+        st.dataframe(jogos[["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "STL", "BLK", "TOV", "PF"]])
