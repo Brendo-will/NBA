@@ -6,21 +6,15 @@ import pytz
 from nba_api.stats.static import teams
 from nba_api.stats.endpoints import ScoreboardV2
 from requests.exceptions import ReadTimeout, ConnectionError
-from nba_api.stats.endpoints import (
-    leaguedashteamstats,
-    LeagueStandingsV3,
-    WinProbabilityPBP,
-    PlayoffPicture,
-    VideoDetails,
-    VideoEvents
-)
+from nba_api.stats.endpoints import leaguedashteamstats
+
 # Configuração da página
 st.set_page_config(page_title="NBA Dashboard", layout="wide")
 
 # Diretório de logos
 LOGOS_DIR = "Logos"
 
-# Função para obter estatísticas por jogo
+# 🔹 Função para obter estatísticas por jogo
 def obter_dados_por_jogo(retries=3, timeout=45):
     for tentativa in range(retries):
         try:
@@ -50,42 +44,54 @@ def obter_dados_por_jogo(retries=3, timeout=45):
     return None
 
 # 🔹 Obtendo dados da NBA
-st.title("🏀 NBA Dashboard - Estatísticas da Temporada 2024-25")
-st.write("Selecione abaixo a métrica para ordenar os times e veja os melhores desempenhos da temporada.")
+st.title("🏀 NBA- Estatísticas da Temporada 2024-25")
 
 ranking_geral = obter_dados_por_jogo()
 
 if ranking_geral is not None:
-    # 🔹 Adicionar um seletor para escolher a métrica de ordenação
-    metrica_opcoes = {
-        "Vitórias": "W",
-        "Pontos por Jogo": "PTS",
-        "Rebotes por Jogo": "REB",
-        "Assistências por Jogo": "AST",
-        "Roubos de Bola por Jogo": "STL",
-        "Bloqueios por Jogo": "BLK",
-        "Turnovers por Jogo": "TOV",
-        "Aproveitamento de Arremessos": "FG_PCT",
-        "Aproveitamento de 3 Pontos": "FG3_PCT",
-        "Aproveitamento de Lance Livre": "FT_PCT",
-        "Saldo de Pontos": "PLUS_MINUS"
-    }
+    # 🔹 Criando três colunas para exibição lado a lado
+    col1, col2, col3 = st.columns(3)
 
-    metrica_escolhida = st.selectbox(
-        "📊 Escolha uma estatística para ordenar:",
-        list(metrica_opcoes.keys()),
-        index=0
-    )
+    with col1:
+        st.markdown("### 🏆 Top 10 Vitórias")
 
-    # 🔹 Adicionar um slider para limitar o número de times exibidos
-    num_times = st.slider("📌 Quantidade de times a exibir:", 5, len(ranking_geral), 10)
+        df_vitorias = ranking_geral.sort_values(by="W", ascending=False).head(10)
 
-    # 🔹 Ordenar os times pela métrica selecionada
-    ranking_ordenado = ranking_geral.sort_values(by=metrica_opcoes[metrica_escolhida], ascending=False).head(num_times)
+        # Renomeando colunas
+        df_vitorias = df_vitorias.rename(columns={
+            "TEAM_NAME": "Times",
+            "W": "Vitórias",
+            "L": "Derrotas"
+        }).reset_index(drop=True)  # Remove o índice numérico
 
-    # 🔹 Exibir a tabela filtrada
-    st.subheader(f"🏆 Top {num_times} Times - {metrica_escolhida}")
-    st.dataframe(ranking_ordenado)
+        # Exibindo a tabela corretamente
+        st.dataframe(df_vitorias[["Times", "Vitórias", "Derrotas"]], hide_index=True)
+
+    with col2:
+        st.markdown("### 🔥 Top 10 Rebotes")
+
+        df_rebotes = ranking_geral.sort_values(by="REB", ascending=False).head(10)
+        df_rebotes = df_rebotes.rename(columns={
+            "TEAM_NAME": "Times",
+            "REB": "Rebotes"
+        }).reset_index(drop=True)  # Remove o índice numérico
+
+        # Exibindo a tabela corretamente
+        st.dataframe(df_rebotes[["Times", "Rebotes"]], hide_index=True)
+
+    with col3:
+        st.markdown("### 🎯 Top 10 Assistências")
+
+        df_assistencias = ranking_geral.sort_values(by="AST", ascending=False).head(10)
+        df_assistencias = df_assistencias.rename(columns={
+            "TEAM_NAME": "Times",
+            "AST": "Assistências"
+        }).reset_index(drop=True)  # Remove o índice numérico
+
+        # Exibindo a tabela corretamente
+        st.dataframe(df_assistencias[["Times", "Assistências"]], hide_index=True)
+
+
 
 # 🔹 Criar um dicionário com os nomes dos times baseados no ID
 def carregar_nomes_times():
@@ -95,52 +101,37 @@ def carregar_nomes_times():
 # Dicionário global dos times
 NOMES_TIMES = carregar_nomes_times()
 
-# 🔹 Função para converter o horário da NBA (ET) para o horário de Brasília (BRT)
+# 🔹 Função para converter horário da NBA (ET) para o horário de Brasília (BRT)
 def converter_horario_nba_para_brasil(horario_et):
     try:
-        # Converter string "6:00 pm ET" para datetime
         hora_et = datetime.strptime(horario_et.replace(" ET", ""), "%I:%M %p")
-
-        # Ajustar fuso horário (ET + 2 horas para BRT)
         hora_brasil = hora_et + pd.Timedelta(hours=2)
-
-        return hora_brasil.strftime("%H:%M %p")  # Retorna formato legível (ex: 20:00 PM)
-    
+        return hora_brasil.strftime("%H:%M %p")
     except Exception:
-        return "Horário inválido"  # Em caso de erro
+        return "Horário inválido"
 
-# 🔹 Função para obter os jogos e depurar a resposta da API
-def obter_jogos_do_dia():
+# 🔹 Escolher a data do jogo
+st.subheader("📅 Escolha a data do jogo")
+data_selecionada = st.date_input("Selecione uma data", datetime.now()).strftime("%Y-%m-%d")
+
+# 🔹 Função para obter os jogos de uma data específica
+def obter_jogos_por_data(data_escolhida):
     try:
-        # Ajustar para o fuso horário da NBA (Eastern Time)
-        est = pytz.timezone("US/Eastern")
-        data_atual_est = datetime.now(est).strftime("%Y-%m-%d")
-
-        with st.spinner(f"⏳ Buscando jogos para {data_atual_est}..."):
-            scoreboard = ScoreboardV2(game_date=data_atual_est)
+        with st.spinner(f"⏳ Buscando jogos para {data_escolhida}..."):
+            scoreboard = ScoreboardV2(game_date=data_escolhida)
             df_lista = scoreboard.get_data_frames()
 
-            # Verificar se alguma resposta foi retornada
             if not df_lista:
                 st.error("⚠️ Nenhum dado retornado pela API!")
                 return None
             
-            df = df_lista[0]  # Pegar o primeiro DataFrame retornado
+            df = df_lista[0]
 
-           
-
-            # 🔹 Verificar os status dos jogos
             if "GAME_STATUS_TEXT" in df.columns:
                 df["Casa"] = df["HOME_TEAM_ID"].map(NOMES_TIMES)
                 df["Visitante"] = df["VISITOR_TEAM_ID"].map(NOMES_TIMES)
-
-                # Aplicar conversão do horário ET para BRT
                 df["HORÁRIO_BRASIL"] = df["GAME_STATUS_TEXT"].apply(converter_horario_nba_para_brasil)
 
-                # st.write("📌 Status dos Jogos Retornados:")
-                # st.dataframe(df[["Casa", "Visitante", "HORÁRIO_BRASIL", "GAME_STATUS_TEXT"]])
-
-                # Filtrar jogos agendados ou em andamento
                 jogos_agendados = df[df["GAME_STATUS_TEXT"].str.contains("Scheduled|Pre|pm ET|am ET", na=False)]
                 return jogos_agendados
 
@@ -152,13 +143,12 @@ def obter_jogos_do_dia():
         st.error(f"Erro ao obter jogos do dia: {e}")
         return None
 
-
-# 🔹 Obter os dados
-jogos_agendados = obter_jogos_do_dia()
+# 🔹 Obter os dados da data escolhida
+jogos_agendados = obter_jogos_por_data(data_selecionada)
 
 # 🔹 Exibir Jogos Agendados
-st.subheader("📅 Jogos do dia")
+st.subheader(f"📅 Jogos do dia {data_selecionada}")
 if jogos_agendados is not None and not jogos_agendados.empty:
     st.dataframe(jogos_agendados[["Casa", "Visitante", "HORÁRIO_BRASIL"]])
 else:
-    st.write("📌 Nenhum jogo agendado encontrado na API.")
+    st.write("📌 Nenhum jogo encontrado para essa data.")
