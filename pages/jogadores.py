@@ -2,11 +2,24 @@ import streamlit as st
 from utils.api_utils import obter_dados_times, obter_elenco_time, obter_ultimos_jogos
 from utils.image_utils import carregar_foto_jogador
 from nba_api.stats.endpoints import playergamelog
+from nba_api.stats.endpoints import leagueleaders
 import plotly.graph_objects as go
 import base64
 import os
 
 FOTOS_DIR = "fotos"
+
+def obter_posicao_no_ranking(nome_jogador, estatistica, season="2023-24"):
+    try:
+        leaders = leagueleaders.LeagueLeaders(season=season, stat_category_abbreviation=estatistica).get_data_frames()[0]
+        leaders["RANK"] = leaders.index + 1  # Adiciona a posição no ranking
+        
+        jogador_info = leaders[leaders["PLAYER"] == nome_jogador]
+        if not jogador_info.empty:
+            return jogador_info["RANK"].values[0]
+        return None
+    except Exception as e:
+        return f"Erro ao buscar ranking: {e}"
 
 def carregar_foto_jogador(nome_jogador):
     nome_formatado = nome_jogador.lower().replace(" ", "-") + ".png"
@@ -18,25 +31,6 @@ def carregar_foto_jogador(nome_jogador):
             return f"data:image/png;base64,{base64_str}"
     
     return "https://via.placeholder.com/150"
-
-def calcular_porcentagem_pontos_jogador(player_id, season):
-    try:
-        player_log = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
-        
-        player_log['PTS_2P'] = (player_log['FGM'] - player_log['FG3M']) * 2  
-        player_log['PTS_3P'] = player_log['FG3M'] * 3  
-        
-        total_points = player_log['PTS'].sum()
-        pts_2p = player_log['PTS_2P'].sum()
-        pts_3p = player_log['PTS_3P'].sum()
-        
-        perc_2p = (pts_2p / total_points) * 100 if total_points > 0 else 0
-        perc_3p = (pts_3p / total_points) * 100 if total_points > 0 else 0
-        
-        return perc_2p, perc_3p
-    except Exception as e:
-        st.write(f"Erro ao calcular porcentagens: {e}")
-        return 0, 0
 
 def pagina_jogadores():
     st.header("👨‍🦰 Estatísticas dos Jogadores")
@@ -52,7 +46,6 @@ def pagina_jogadores():
         st.error("Não foi possível carregar os dados dos times.")
         return
 
-    # Criar colunas para que a seleção de time e jogador fiquem lado a lado
     col1, col2 = st.columns(2)
 
     with col1:
@@ -92,38 +85,34 @@ def pagina_jogadores():
             with col2:
                 st.write(f"**Time:** {time_nome}")
 
-            # **Aqui ajustamos a seleção de temporadas e métricas para ficarem lado a lado**
-            col1, col2 = st.columns(2)
+            # Seleção de estatísticas
+            metricas = {
+                "PTS": "Pontos",
+                "AST": "Assistências",
+                "REB": "Rebotes",
+                "STL": "Roubos de Bola",
+                "BLK": "Bloqueios",
+                "TOV": "Turnovers",
+                "PF": "Faltas Pessoais"
+            }
+            metrica_selecionada = st.selectbox(
+                "Selecione a métrica para o gráfico", 
+                options=metricas.keys(), 
+                format_func=lambda x: metricas[x]
+            )
 
-            with col1:
-                temporadas = ["2021-22", "2022-23", "2023-24", "2024-25"]
-                temporadas_selecionadas = st.multiselect(
-                    "Selecione as temporadas", temporadas, default=temporadas, key="temporadas_estatisticas"
-                )
+            # Obter posição do jogador no ranking da estatística escolhida
+            with st.spinner(f"Buscando ranking de {jogador_selecionado} em {metricas[metrica_selecionada]}..."):
+                posicao_ranking = obter_posicao_no_ranking(jogador_selecionado, metrica_selecionada)
 
-            with col2:
-                metricas = {
-                    "PTS": "Pontos",
-                    "AST": "Assistências",
-                    "REB": "Rebotes",
-                    "STL": "Roubos de Bola",
-                    "BLK": "Bloqueios",
-                    "TOV": "Turnovers",
-                    "PF": "Faltas Pessoais"
-                }
-                metrica_selecionada = st.selectbox(
-                    "Selecione a métrica para o gráfico", 
-                    options=metricas.keys(), 
-                    format_func=lambda x: metricas[x]
-                )
+            if posicao_ranking:
+                st.write(f"📊 **Posição no ranking de {metricas[metrica_selecionada]}:** {posicao_ranking}º")
+            else:
+                st.write("🔍 Jogador não encontrado no ranking.")
 
-            perc_2p, perc_3p = calcular_porcentagem_pontos_jogador(player_id, temporadas_selecionadas)
-            st.write(f"🔢 **Porcentagem de pontos de 2 pontos:** {perc_2p:.2f}%")
-            st.write(f"🎯 **Porcentagem de pontos de 3 pontos:** {perc_3p:.2f}%")  
-
+            # Mostrar estatísticas gráficas
             if not ultimos_jogos.empty:
                 valor_referencia = st.slider(f"Escolha o limite de {metricas[metrica_selecionada]}", 1, 50, 10)
-
                 ultimos_jogos["Cor"] = ["green" if valor >= valor_referencia else "red" for valor in ultimos_jogos[metrica_selecionada]]
 
                 fig = go.Figure()
@@ -155,6 +144,7 @@ def pagina_jogadores():
 
         else:
             st.write("O elenco deste time não está disponível.")     
+
 
 if __name__ == "__main__":
     pagina_jogadores()
