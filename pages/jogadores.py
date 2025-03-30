@@ -158,5 +158,25 @@ def pagina_jogadores():
         ).round(2)
         st.dataframe(df_jogos)
 
+
+    # Últimos 10 jogos
+    ultimos_10_jogos = game_log.head(10)
+    valores_metrica = ultimos_10_jogos[metrica_selecionada]
+
+    # Checar se ele fez pelo menos X pontos em todos os jogos
+    limite = st.number_input(f"Valor mínimo desejado para {TRADUCAO_METRICAS[metrica_selecionada]}", min_value=0, value=15)
+
+    todos_acima = (valores_metrica >= limite).all()
+    maior_valor = valores_metrica.max()
+
+    st.write(f"📌 Nos últimos 10 jogos, o maior valor de **{TRADUCAO_METRICAS[metrica_selecionada]}** foi **{maior_valor}**.")
+
+    if todos_acima:
+        st.success(f"✅ {jogador_selecionado} fez **pelo menos {limite} {TRADUCAO_METRICAS[metrica_selecionada]}** em **todos os últimos 10 jogos**.")
+    else:
+        abaixo = valores_metrica[valores_metrica < limite].count()
+        st.warning(f"⚠️ {jogador_selecionado} não atingiu **{limite} {TRADUCAO_METRICAS[metrica_selecionada]}** em {abaixo} dos últimos 10 jogos.")
+
+
 if __name__ == "__main__":
     pagina_jogadores()
