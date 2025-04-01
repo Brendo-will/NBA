@@ -94,6 +94,9 @@ def carregar_foto_jogador(nome_jogador):
     
     return "https://via.placeholder.com/150"
 
+def get_jogadores_time(team_id):
+        elenco = obter_elenco_time(team_id)
+        return [{"id": pid, "nome": nome} for nome, pid in elenco.items()]
 # Interface do Streamlit
 def pagina_jogadores():
     st.header("🏀 Análise Estatística de Jogadores para Apostas")
@@ -177,6 +180,8 @@ def pagina_jogadores():
         abaixo = valores_metrica[valores_metrica < limite].count()
         st.warning(f"⚠️ {jogador_selecionado} não atingiu **{limite} {TRADUCAO_METRICAS[metrica_selecionada]}** em {abaixo} dos últimos 10 jogos.")
 
+    # Função utilitária para apostas: retorna uma lista de jogadores com id e nome
+    
 
 if __name__ == "__main__":
     pagina_jogadores()
