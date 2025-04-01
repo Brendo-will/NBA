@@ -6,6 +6,10 @@ from datetime import datetime
 from nba_api.stats.static import teams
 from nba_api.stats.endpoints import teamdetails, commonteamroster, teamgamelog
 import base64
+from nba_api.stats.static import teams
+from nba_api.stats.endpoints import ScoreboardV2
+from datetime import datetime
+import pandas as pd
 
 # 🔥 Configuração da Página
 st.set_page_config(page_title="Detalhes da Equipe", layout="wide")
@@ -80,6 +84,43 @@ def carregar_logo_time(nome_time):
     img_base64 = encode_image_to_base64(caminho_logo)
     return f"data:image/png;base64,{img_base64}" if img_base64 else "https://via.placeholder.com/150"
 
+
+def get_jogos_do_dia(data=None):
+    if data is None:
+        data = datetime.now().strftime("%Y-%m-%d")
+
+    nomes_times = {team["id"]: team["full_name"] for team in teams.get_teams()}
+
+    try:
+        scoreboard = ScoreboardV2(game_date=data)
+        df_lista = scoreboard.get_data_frames()
+
+        if not df_lista:
+            return []
+
+        df = df_lista[0]
+
+        df["Casa"] = df["HOME_TEAM_ID"].map(nomes_times)
+        df["Visitante"] = df["VISITOR_TEAM_ID"].map(nomes_times)
+
+        jogos_agendados = df[df["GAME_STATUS_TEXT"].str.contains("Scheduled|Pre|pm ET|am ET", na=False)]
+
+        jogos = [
+            {
+                "team1_id": row["HOME_TEAM_ID"],
+                "team2_id": row["VISITOR_TEAM_ID"],
+                "team1_nome": row["Casa"],
+                "team2_nome": row["Visitante"],
+            }
+            for _, row in jogos_agendados.iterrows()
+        ]
+
+        return jogos
+
+    except Exception as e:
+        print(f"Erro ao buscar jogos do dia: {e}")
+        return []
+
 # 🎯 Função para carregar a foto do jogador
 def carregar_foto_jogador(nome_jogador):
     nome_formatado = nome_jogador.lower().replace(" ", "-") + ".png"
@@ -140,3 +181,4 @@ if team_id:
 
 else:
     st.error("❌ Time não encontrado. Selecione um time válido no menu lateral.")
+
