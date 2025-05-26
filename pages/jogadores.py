@@ -45,7 +45,12 @@ def obter_estatisticas_jogador(player_id, season=None):
         season = obter_temporada_atual()
     
     try:
-        game_log = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
+        game_log = playergamelog.PlayerGameLog(
+            player_id=player_id,
+            season=season,
+            season_type_all_star="Playoffs"  # ou "Regular Season", "PlayIn", etc.
+        ).get_data_frames()[0]
+
 
         if game_log.empty:
             return None, None, f"Erro: Nenhum jogo encontrado para o jogador na temporada {season}."
