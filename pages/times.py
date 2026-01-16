@@ -50,7 +50,7 @@ st.title(f"🏀 Detalhes da Equipe - {team_name}")
 # 🎯 Função para calcular estatísticas avançadas
 def calcular_estatisticas_avancadas(team_id):
     try:
-        jogos = teamgamelog.TeamGameLog(team_id=team_id, season="2024-25").get_data_frames()[0]
+        jogos = teamgamelog.TeamGameLog(team_id=team_id, season="2025-26").get_data_frames()[0]
         
         jogos_casa = jogos[jogos["MATCHUP"].str.contains("vs")]
         jogos_fora = jogos[jogos["MATCHUP"].str.contains("@")]
