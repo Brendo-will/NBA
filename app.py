@@ -50,7 +50,7 @@ if menu == "Top 10":
             try:
                 with st.spinner("📊 Buscando estatísticas de times..."):
                     ranking = leaguedashteamstats.LeagueDashTeamStats(
-                        season="2024-25",
+                        season="2025-26",
                         season_type_all_star="Regular Season",
                         per_mode_detailed="PerGame"
                     ).get_data_frames()[0]
