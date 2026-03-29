@@ -12,7 +12,7 @@ def obter_elenco_time(team_id):
     return commonteamroster.CommonTeamRoster(team_id=team_id).get_data_frames()[0]
 
 def obter_ultimos_jogos(player_id):
-    return playergamelog.PlayerGameLog(player_id=player_id, season="2025-26").get_data_frames()[0]
+    return playergamelog.PlayerGameLog(player_id=player_id, season="2024-25").get_data_frames()[0]
 
 def obter_historico_por_temporadas(player_id, temporadas):
     historico = []

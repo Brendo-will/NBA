@@ -4,12 +4,8 @@ import os
 import requests
 from datetime import datetime
 from nba_api.stats.static import teams
-from nba_api.stats.endpoints import teamdetails, commonteamroster, teamgamelog
+from nba_api.stats.endpoints import teamdetails, commonteamroster, teamgamelog, ScoreboardV2
 import base64
-from nba_api.stats.static import teams
-from nba_api.stats.endpoints import ScoreboardV2
-from datetime import datetime
-import pandas as pd
 
 # 🔥 Configuração da Página
 st.set_page_config(page_title="Detalhes da Equipe", layout="wide")
@@ -50,7 +46,7 @@ st.title(f"🏀 Detalhes da Equipe - {team_name}")
 # 🎯 Função para calcular estatísticas avançadas
 def calcular_estatisticas_avancadas(team_id):
     try:
-        jogos = teamgamelog.TeamGameLog(team_id=team_id, season="2025-26").get_data_frames()[0]
+        jogos = teamgamelog.TeamGameLog(team_id=team_id, season="2024-25").get_data_frames()[0]
         
         jogos_casa = jogos[jogos["MATCHUP"].str.contains("vs")]
         jogos_fora = jogos[jogos["MATCHUP"].str.contains("@")]
